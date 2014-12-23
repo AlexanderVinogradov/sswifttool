@@ -1,0 +1,340 @@
+#!/usr/bin/perl
+
+use strict;
+use LWP::UserAgent;
+
+my $user = $ARGV[0];
+my $pass = $ARGV[1];
+my $host = $ARGV[2];
+my $port = $ARGV[3];
+my $proto = $ARGV[4];
+my $ns = $ARGV[5];
+my $func = $ARGV[6];
+my $token = '';
+
+if (
+	$ARGV[0] eq '' or 
+	$ARGV[1] eq '' or 
+	$ARGV[2] eq '' or 
+	$ARGV[3] eq '' or 
+	$ARGV[4] eq '' or
+	$ARGV[5] eq ''
+) {
+	print "
+		Usage: user pass host port protocol namespace function function_parameters
+		Functions: 
+				get_token 			Update your token for authorization.
+				list				List all avaliable containers.
+				list_cont			List objects inside container. Parameters: container_name
+				get_obj				View object. Parameters: container_name object_name 
+				create_cont			Create container. Parameters: container_name
+				upload				Upload file to container. Parameters: container_name object_name full_path_to_file 
+				delete_obj			Delete object. Parameters: container_name object_name
+				delete_cont			Delete container. Parameters: container_name
+				delete_cont_list		Delete containers by list. Parameters: path_to_file_with_list
+				create_cont_list                Create containers with all objects by list. Parameters: path_to_file_with_list
+				upload_obj_list			Upload files to some container by list. Parameters: container_name path_to_file_with_list (list format: object_name full_path_to_file)
+				delete_obj_list 	        Delete files from some container by list. Parameters: container_name path_to_file_with_list
+	\n";
+	exit 1;
+}
+
+open (F, "</tmp/sswift_tool.token")
+	or die "Can't open /tmp/sswift_tool.token\n";
+our $token = <F>;
+chomp $token;
+close(F);
+
+print "Token: $token\n\n";
+
+sub make_req ($$) {
+        my $req_type = shift;
+        my $server_endpoint = shift;
+
+        my $ua = LWP::UserAgent->new;
+        my $req = HTTP::Request->new($req_type => $server_endpoint);
+        $req->header('x-auth-token' => $token);
+
+        my $resp = $ua->request($req);
+        if ($resp->is_success) {
+                my $message = $resp->decoded_content;
+                return $message;
+        }
+        else {
+		return $resp->code, " ", $resp->message;
+        }
+}
+
+sub make_req_au ($$$$) {
+        my $req_type = shift;
+        my $server_endpoint = shift;
+	my $u = shift;
+	my $p = shift;
+
+        my $ua = LWP::UserAgent->new;
+        my $req = HTTP::Request->new($req_type => $server_endpoint);
+	$req->header('X-Auth-User' => $u);
+        $req->header('X-Auth-Key' => $p);
+
+        my $resp = $ua->request($req);
+        if ($resp->is_success) {
+		my $head = $resp->headers()->as_string;
+                return $head;
+        }
+        else {
+                return $resp->code, " ", $resp->message;
+        }
+}
+
+sub make_req_up ($$$) {
+        my $req_type = shift;
+        my $server_endpoint = shift;
+        my $file = shift;
+
+	open(F, "<$file")
+		or die "Can't open $file\n";
+	binmode F;
+
+	my $readFunc = sub {
+		read F, my $buf, 65536;
+		return $buf;
+	};
+
+        my $ua = LWP::UserAgent->new;
+        my $req = HTTP::Request->new($req_type => $server_endpoint);
+        $req->header('x-auth-token' => $token);
+	$req->content($readFunc);	
+
+        my $resp = $ua->request($req);
+        if ($resp->is_success) {
+        	my $message = $resp->decoded_content;
+                return $message;
+	}
+        else {
+                return $resp->code, " ", $resp->message;
+        }
+}
+
+if ($func eq 'get_token') {
+	my $o = make_req_au('GET', "$proto://$host:$port/auth/v1.0", $user, $pass);
+	my @out = split("\n", $o);
+
+	my $token = '';
+	foreach (@out) {
+		chomp;
+		if ($_ =~ /X-Auth-Token:/) {
+			my @ta = split(" ", $_);
+			$token = $ta[1];
+			last;
+		}
+	}
+
+	open (F, ">/tmp/sswift_tool.token")
+		or die "Can't open /tmp/sswift_tool.token\n";
+	print F "$token";
+	close(F);
+}
+
+if ($func eq 'list') {
+	my @c_list = make_req('GET', "$proto://$host:$port/v1/$ns");
+	print "Answer:\n";
+	for (@c_list) {
+		chomp;
+		print "$_\n";
+	}
+}
+
+if ($func eq 'list_cont') {
+	if (!$ARGV[7]) {
+		print "Wrong params\n";
+		exit 1;
+	}
+	my $cont_name = $ARGV[7];
+        my @c_list = make_req('GET', "$proto://$host:$port/v1/$ns/$cont_name");
+        print "Answer:\n";
+        for (@c_list) {
+                chomp;
+                print "$_\n";
+        }
+}
+
+if ($func eq 'get_obj') {
+	if (!$ARGV[7] or !$ARGV[8]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+        my $cont_name = $ARGV[7];
+	my $obj_name = $ARGV[8];
+	my @c_list = make_req('GET', "$proto://$host:$port/v1/$ns/$cont_name/$obj_name");
+        print "Answer:\n";
+        for (@c_list) {
+                chomp;
+                print "$_\n";
+        }
+}
+
+if ($func eq 'create_cont') {
+	if (!$ARGV[7]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+        my $cont_name = $ARGV[7];
+	my @c_list = make_req('PUT', "$proto://$host:$port/v1/$ns/$cont_name");
+        print "Answer:\n";
+        for (@c_list) {
+                chomp;
+                print "$_\n";
+        }
+}
+
+if ($func eq 'upload') {
+        if (!$ARGV[7] or !$ARGV[8] or !$ARGV[9]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+	my $cont_name = $ARGV[7];
+	my $obj_name = $ARGV[8];
+	my $file = $ARGV[9];
+        my @c_list = make_req_up('PUT', "$proto://$host:$port/v1/$ns/$cont_name/$obj_name", "$file");
+        print "Answer:\n";
+        for (@c_list) {
+                chomp;
+                print "$_\n";
+        }
+}
+
+if ($func eq 'delete_obj') {
+	if (!$ARGV[7] or !$ARGV[8]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+        my $cont_name = $ARGV[7];
+        my $obj_name = $ARGV[8];
+	my @c_list = make_req('DELETE', "$proto://$host:$port/v1/$ns/$cont_name/$obj_name");
+        print "Answer:\n";
+        for (@c_list) {
+                chomp;
+                print "$_\n";
+        }
+}
+
+if ($func eq 'delete_cont') {
+        if (!$ARGV[7]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+	my $cont_name = $ARGV[7];
+	my @c_list = make_req('DELETE', "$proto://$host:$port/v1/$ns/$cont_name");
+        print "Answer:\n";
+        for (@c_list) {
+                chomp;
+                print "$_\n";
+        }
+}
+
+if ($func eq 'delete_cont_list') {
+        if (!$ARGV[7]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+	my $file = $ARGV[7];
+
+	open(F, "<$file")
+		or die "Can't open $file\n";
+	my @list = <F>;
+	close(F);
+
+	foreach my $c (@list) {
+		chomp($c);
+		print "Container: $c\n";
+		my @cont_in = make_req('GET', "$proto://$host:$port/v1/$ns/$c");
+		foreach my $o (@cont_in) {
+			chomp($o);
+			print "Object: $o\n";
+			my @obj_del_out = make_req('DELETE', "$proto://$host:$port/v1/$ns/$c/$o");
+			foreach my $odo (@obj_del_out) {
+				chomp($odo);
+				print "$odo\n";
+			} 
+		}
+		my @cont_del_out = make_req('DELETE', "$proto://$host:$port/v1/$ns/$c");
+		foreach my $cdo (@cont_del_out) {
+			chomp($cdo);
+			print "$cdo\n";
+		}
+	}
+}
+
+if ($func eq 'create_cont_list') {
+        if (!$ARGV[7]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+        my $file = $ARGV[7];
+
+        open(F, "<$file")
+                or die "Can't open $file\n";
+        my @list = <F>;
+        close(F);
+
+        foreach my $c (@list) {
+                chomp($c);
+                print "Container: $c\n";
+                my @cont_in =  make_req('PUT', "$proto://$host:$port/v1/$ns/$c");
+                foreach my $o (@cont_in) {
+                        chomp($o);
+                        print "$o\n";
+                }
+        }
+}
+
+if ($func eq 'upload_obj_list') {
+        if (!$ARGV[7] or !$ARGV[8]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+        my $cont = $ARGV[7];
+	my $file = $ARGV[8];
+
+        open(F, "<$file")
+                or die "Can't open $file\n";
+        my @list = <F>;
+        close(F);
+
+        foreach my $c (@list) {
+                chomp($c);
+		my @cp = split(" ", $c);
+                print "Upload: $c\n";
+                my @cont_in =  make_req_up('PUT', "$proto://$host:$port/v1/$ns/$cont/$cp[0]", $cp[1]);
+                foreach my $o (@cont_in) {
+                        chomp($o);
+                        print "$o\n";
+                }
+        }
+}
+
+if ($func eq 'delete_obj_list') {
+        if (!$ARGV[7] or !$ARGV[8]) {
+                print "Wrong params\n";
+                exit 1;
+        }
+        my $cont = $ARGV[7];
+	my $file = $ARGV[8];
+
+        open(F, "<$file")
+                or die "Can't open $file\n";
+        my @list = <F>;
+        close(F);
+
+        foreach my $c (@list) {
+                chomp($c);
+                print "Object: $c\n";
+                my @obj_del_out = make_req('DELETE', "$proto://$host:$port/v1/$ns/$cont/$c");
+                foreach my $odo (@obj_del_out) {
+                	chomp($odo);
+                        print "$odo\n";
+		}
+	}
+}
+
+
