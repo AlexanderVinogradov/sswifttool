@@ -26,6 +26,8 @@ if (
 				get_token 			Update your token for authorization.
 				list				List all avaliable containers.
 				list_cont			List objects inside container. Parameters: container_name
+				view				View information about namespace.
+				view_cont			View info about container. Parameters: container_name
 				get_obj				View object. Parameters: container_name object_name 
 				create_cont			Create container. Parameters: container_name
 				upload				Upload file to container. Parameters: container_name object_name full_path_to_file 
@@ -144,6 +146,15 @@ if ($func eq 'list') {
 	}
 }
 
+if ($func eq 'view') {
+	my @c_list = make_req('HEAD', "$proto://$host:$port/v1/$ns");
+	print "Answer:\n";
+	for (@c_list) {
+		chomp;
+		print "$_\n";
+	}
+}
+
 if ($func eq 'list_cont') {
 	if (!$ARGV[7]) {
 		print "Wrong params\n";
@@ -151,6 +162,20 @@ if ($func eq 'list_cont') {
 	}
 	my $cont_name = $ARGV[7];
         my @c_list = make_req('GET', "$proto://$host:$port/v1/$ns/$cont_name");
+        print "Answer:\n";
+        for (@c_list) {
+                chomp;
+                print "$_\n";
+        }
+}
+
+if ($func eq 'view_cont') {
+	if (!$ARGV[7]) {
+		print "Wrong params\n";
+		exit 1;
+	}
+	my $cont_name = $ARGV[7];
+        my @c_list = make_req('HEAD', "$proto://$host:$port/v1/$ns/$cont_name");
         print "Answer:\n";
         for (@c_list) {
                 chomp;
