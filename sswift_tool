@@ -21,7 +21,7 @@ if (
 	$ARGV[5] eq ''
 ) {
 	print "
-		Usage: user pass host port protocol namespace function function_parameters
+		Usage: user pass host port protocol namespace function_name function_parameters
 		Functions: 
 				get_token 			Update your token for authorization.
 				list				List all avaliable containers.
@@ -31,10 +31,10 @@ if (
 				upload				Upload file to container. Parameters: container_name object_name full_path_to_file 
 				delete_obj			Delete object. Parameters: container_name object_name
 				delete_cont			Delete container. Parameters: container_name
-				delete_cont_list		Delete containers by list. Parameters: path_to_file_with_list
-				create_cont_list                Create containers with all objects by list. Parameters: path_to_file_with_list
-				upload_obj_list			Upload files to some container by list. Parameters: container_name path_to_file_with_list (list format: object_name full_path_to_file)
-				delete_obj_list 	        Delete files from some container by list. Parameters: container_name path_to_file_with_list
+				delete_cont_list	Delete containers by list. Parameters: path_to_file_with_list
+				create_cont_list    Create containers with all objects by list. Parameters: path_to_file_with_list
+				upload_obj_list		Upload files to some container by list. Parameters: container_name path_to_file_with_list (list format: object_name full_path_to_file)
+				delete_obj_list 	Delete files from some container by list. Parameters: container_name path_to_file_with_list
 	\n";
 	exit 1;
 }
